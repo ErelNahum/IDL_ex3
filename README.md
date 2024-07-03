@@ -1,1 +1,2 @@
-# IDL_ex3
+Names: Nadav Murad, Erel Nahum
+CSE users: nadav_murad, erel
