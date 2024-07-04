@@ -6,6 +6,7 @@
 ########################################################################
 ########################################################################
 
+import os
 import torch
 import numpy as np
 import torch.nn as nn
@@ -24,7 +25,7 @@ num_epochs = 10
 learning_rate = 0.001
 test_interval = 50
 
-WEIGHTS_DIR_PATH = 'weights'
+WEIGHTS_DIR_PREFIX = 'weights/'
 
 # Loading sataset, use toy = True for obtaining a smaller dataset
 
@@ -216,13 +217,14 @@ def select_model():
 
 def load_model():
     model = select_model()
-    if reload_model:
+    model_file_path = get_model_weights_path(model.name())
+    if reload_model and os.path.exists(model_file_path):
         print("Reloading model")
-        model.load_state_dict(torch.load(WEIGHTS_DIR_PATH + '/' + model.name() + ".pth"))
+        model.load_state_dict(torch.load(model_file_path))
     return model
 
 
-def run_token_wise_model(model, output, reviews):
+def run_token_wise_model(model, reviews):
     sub_score = []
     if atten_size > 0:
         # MLP + atten
@@ -232,6 +234,10 @@ def run_token_wise_model(model, output, reviews):
         sub_score = model(reviews)
     output = torch.mean(sub_score, 1)
     return output, sub_score
+
+
+def get_model_weights_path(model_name):
+    return WEIGHTS_DIR_PREFIX + model_name + ".pth"
 
 
 def post_test_iter(epoch, itr, labels, model, reviews_text, sub_score, test_loss, train_loss):
@@ -246,7 +252,7 @@ def post_test_iter(epoch, itr, labels, model, reviews_text, sub_score, test_loss
         labels = labels.detach().numpy()
         print_review(reviews_text[0], nump_subs[0, :, 0], nump_subs[0, :, 1], labels[0, 0], labels[0, 1])
     # saving the model
-    torch.save(model, WEIGHTS_DIR_PATH + '/' + model.name() + ".pth")
+    torch.save(model, get_model_weights_path(model.name()))
 
 
 def run_recurrent_model(labels, model, reviews):
@@ -256,7 +262,7 @@ def run_recurrent_model(labels, model, reviews):
     return output, hidden_state
 
 
-def epoch_iteration(criterion, epoch, model, optimizer, test_loss, train_loss):
+def epoch_iteration(criterion, epoch, model, optimizer, test_loss, train_loss, sub_score=None):
     itr = 0  # iteration counter within each epoch
     for labels, reviews, reviews_text in train_dataset:  # getting training batches
 
@@ -273,7 +279,7 @@ def epoch_iteration(criterion, epoch, model, optimizer, test_loss, train_loss):
             output, hidden_state = run_recurrent_model(labels, model, reviews)
         # Token-wise networks (MLP / MLP + Atten.)
         else:
-            output, sub_score = run_token_wise_model(model, output, reviews)
+            output, sub_score = run_token_wise_model(model, reviews)
 
         # cross-entropy loss
         loss = criterion(output, labels)
