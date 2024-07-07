@@ -38,7 +38,8 @@ def load_data_set(load_my_reviews=False):
     test_data = data[Train_size:]
     if load_my_reviews:
         my_data = pd.DataFrame({"review": my_test_texts, "sentiment": my_test_labels})
-        test_data = test_data.append(my_data)
+        # test_data = test_data.append(my_data)
+        test_data = my_data
     test_data = test_data.reset_index(drop=True)
     test_iter = ReviewDataset(test_data["review"], test_data["sentiment"])
     return train_iter, test_iter

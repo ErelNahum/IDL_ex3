@@ -55,7 +55,7 @@ class ExRestSelfAtten(nn.Module):
         # x_nei has an additional axis that corresponds to the offset
 
         # Applying attention layer
-        query = self.W_q(x)  # TODO: if it doesnt work, unsqueeze(2) and fix einsum
+        query = self.W_q(x)
         keys = self.W_k(x_nei)
         vals = self.W_v(x_nei)
 

@@ -23,9 +23,9 @@ output_size = 2
 
 run_recurrent = False  # else run Token-wise MLP
 use_RNN = False  # otherwise GRU
-atten_size = 5  # atten > 0 means using restricted self atten
+atten_size = 0  # atten > 0 means using restricted self atten
 
-reload_model = False
+reload_model = True
 num_epochs = 10
 learning_rate = 0.001
 test_interval = 50
@@ -33,9 +33,9 @@ test_interval = 50
 WEIGHTS_DIR_PREFIX = 'weights/'
 RESULTS_DIR_PREFIX = 'results/'
 
-# Loading sataset, use toy = True for obtaining a smaller dataset
-
-train_dataset, test_dataset, num_words, input_size = ld.get_data_set(batch_size)
+# Loading dataset, use toy = True for obtaining a smaller dataset
+toy = True
+train_dataset, test_dataset, num_words, input_size = ld.get_data_set(batch_size, toy=toy)
 
 
 # prints portion of the review (20-30 first words), with the sub-scores each word obtained
@@ -196,10 +196,35 @@ def plot_graphs(model_name, train_losses, test_losses, train_accuracies, test_ac
     plot_accuracy(model_name, test_accuracies, train_accuracies, hidden_size)
 
 
+def get_outcome_type(pred, labels):
+    outcome = ''
+    outcome += 'T' if np.argmax(pred) == np.argmax(labels) else 'F'
+    outcome += 'P' if np.argmax(pred) == 0 else 'N'
+    return outcome
+
+
+def test_sentences(model):
+    for labels, reviews, reviews_text in test_dataset:
+        if run_recurrent:
+            output, hidden_state = run_recurrent_model(labels, model, reviews)
+        else:
+            output, sub_score = run_token_wise_model(model, reviews)
+
+        for i, rev in enumerate(reviews_text):
+            print(f"Review: {rev}")
+            print(f"True label: [{labels[i][0]},{labels[i][1]}]")
+            pred = torch.nn.functional.softmax(output[i], dim=0)
+            print(f"Predicted label: [{pred[0]},{pred[1]}]")
+            print('Outcome:', get_outcome_type(pred.detach().numpy(), labels[i].detach().numpy()))
+
+
 def main():
     hidden_size = 128  # to experiment with
 
     model = load_model(hidden_size)
+    if toy:
+        test_sentences(model)
+        return
 
     criterion = nn.CrossEntropyLoss()
     optimizer = torch.optim.Adam(model.parameters(), lr=learning_rate)
@@ -218,7 +243,7 @@ def main():
         train_accuracies.append(train_accuracy)
 
     # saving the model
-    torch.save(model, get_model_weights_path(model.name(), hidden_size))
+    torch.save(model.state_dict(), get_model_weights_path(model.name(), hidden_size))
 
     plot_graphs(model.name(), train_losses, test_losses, train_accuracies, test_accuracies, hidden_size)
 
