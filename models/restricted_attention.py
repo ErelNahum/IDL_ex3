@@ -4,6 +4,7 @@ import torch.nn as nn
 from torch.nn.functional import pad
 
 from models.matmul import MatMul
+from models.positional_encoding import PositionalEncoding
 
 atten_size = 5
 
@@ -17,6 +18,7 @@ class ExRestSelfAtten(nn.Module):
         self.sqrt_hidden_size = np.sqrt(float(hidden_size))
         self.ReLU = torch.nn.ReLU()
         self.softmax = torch.nn.Softmax(2)
+        self.positional_encode = PositionalEncoding(input_size, input_size)
 
         # Token-wise MLP + Restricted Attention network implementation
 
@@ -29,12 +31,13 @@ class ExRestSelfAtten(nn.Module):
         self.W_v = MatMul(hidden_size, hidden_size, use_bias=False)
 
         self.atten2out = MatMul(hidden_size, output_size)
-        # rest ...
 
     def name(self):
         return "MLP_atten"
 
     def forward(self, x):
+        x = self.positional_encode(x)
+
         # Token-wise MLP + Restricted Attention network implementation
         x = self.layer1(x)
 
@@ -51,20 +54,16 @@ class ExRestSelfAtten(nn.Module):
 
         # x_nei has an additional axis that corresponds to the offset
 
-        sub = []
-        weights = []
-        for i in range(2 * self.atten_size + 1):
-            xi = x_nei[:, :, i, :]
-            # Applying attention layer
-            query = self.W_q(xi)
-            keys = self.W_k(xi)
-            vals = self.W_v(xi)
+        # Applying attention layer
+        query = self.W_q(x)  # TODO: if it doesnt work, unsqueeze(2) and fix einsum
+        keys = self.W_k(x_nei)
+        vals = self.W_v(x_nei)
 
-            weights.append(self.softmax(torch.bmm(query, keys.transpose(1, 2)) / self.sqrt_hidden_size))
+        atten_weights = torch.einsum('bwh,bwoh->bwo', [query, keys]) / self.sqrt_hidden_size
+        atten_weights = self.softmax(atten_weights)
 
-            sub.append(torch.bmm(weights[-1], vals))
+        x = torch.einsum('bwo,bwoh->bwh', [atten_weights, vals])
 
-        x = torch.stack(sub, 2)
         x = self.atten2out(x)
 
-        return x, torch.stack(weights, 2)
+        return x, atten_weights

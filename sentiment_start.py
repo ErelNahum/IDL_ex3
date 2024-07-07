@@ -8,6 +8,7 @@
 
 import os
 import torch
+import numpy as np
 import torch.nn as nn
 import loaders.loader as ld
 
@@ -41,7 +42,15 @@ train_dataset, test_dataset, num_words, input_size = ld.get_data_set(batch_size)
 # prints also the final scores, the softmaxed prediction values and the true label values
 
 def print_review(rev_text, sbs1, sbs2, lbl1, lbl2):
-    pass
+    print('*********************')
+    for i in range(20):
+        print(f'Word: {rev_text[i]}, Sub Score: [{sbs1[i]}, {sbs2[i]}]')
+    print(f'\nFinal score: [{sbs1.sum()}, {sbs2.mean()}]')
+    scores = torch.tensor(np.stack([sbs1, sbs2]))
+    softmax_scores = torch.nn.functional.softmax(scores.sum(1), dim=0)
+    print(f'Softmaxed prediction: [{softmax_scores[0]}, {softmax_scores[1]}]')
+    print(f'True label: [{lbl1}, {lbl2}]')
+    print('*********************')
 
 
 def select_model(hidden_size):
